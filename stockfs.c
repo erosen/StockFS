@@ -22,7 +22,7 @@ int socket_set_up() {
 	
 	return sd;
 }
-/* Take in the socket and requested symbol, then output the acompanying data */
+/* Take in the socket and requested symbol, then output the data the server responds with */
 void getStockInfo(int sd, char* symbol, char *buffer) {
 	
 	int bytes;
@@ -39,17 +39,11 @@ void getStockInfo(int sd, char* symbol, char *buffer) {
 	
 }
 
-int main(void) {
-
-	int i, j, sd = socket_set_up();
-	char *symbol; 
-	static char buffer[1024];
-	char data[8][25]; /* parsed stock info */
-		
-	symbol = "aapl";
-	getStockInfo(sd, symbol, buffer);
+/* Parse the server data into tokens that translate to the required data */
+void parseStockInfo(char *buffer) {
+	int i, j;
+	char data[8][25];
 	
-	/* begin buffer parsing */
 	for (i = 0; i < 1023; i++) { /* find start of string */
 		if ( (buffer[i] == '\r') && (buffer[i+1] == '\n') && (buffer[i+2] == '\r') && (buffer[i+3] == '\n') ) {
 			i += 5;
@@ -61,78 +55,87 @@ int main(void) {
 		data[0][j] = buffer[i];
 		i++;
 		
-		if (buffer[i] == '"')
+		if (buffer[i] == '"') {
+			data[0][j+1] = '\0';
+			i+=3;
 			break;
+		}
 	}
 	
-	i+=3;
-	
-	for (j = 0; j < 25; j++) { /* Company */
+	for (j = 0; j < 40; j++) { /* Company */
 		data[1][j] = buffer[i];
 		i++;
 		
-		if(buffer[i] == '"')
+		if(buffer[i] == '"') {
+			data[1][j+1] = '\0';
+			i+=2;
 			break;
+		}
 	}
-	
-	i+=2;	
-	
+
 	for (j = 0; j < 10; j++) { /* last trade */
 		data[2][j] = buffer[i];
 		i++;
 		
-		if(buffer[i] == ',')
+		if(buffer[i] == ',') {
+			data[2][j+1] = '\0';
+			i++;
 			break;
+		}
 	}
-	
-	i++;
 	
 	for (j = 0; j < 10; j++) { /* change */
 		data[3][j] = buffer[i];
 		i++;
 		
-		if(buffer[i] == ',')
+		if(buffer[i] == ',') {
+			data[3][j+1] = '\0';
+			i++;
 			break;
+		}
 	}
-	
-	i++;
 	
 	for (j = 0; j < 10; j++) { /* bid */
 		data[4][j] = buffer[i];
 		i++;
 		
-		if(buffer[i] == ',')
+		if(buffer[i] == ',') {
+			data[4][j+1] = '\0';
+			i++;
 			break;
+		}
 	}
-	
-	i++;
 	
 	for (j = 0; j < 10; j++) { /* ask */
 		data[5][j] = buffer[i];
 		i++;
 		
-		if(buffer[i] == ',')
+		if(buffer[i] == ',') {
+			data[5][j+1] = '\0';
+			i++;
 			break;
+		}
 	}
-		
-	i++;
 		
 	for (j = 0; j < 10; j++) { /* bid size */
 		data[6][j] = buffer[i];
 		i++;
 		
-		if(buffer[i] == ',')
+		if(buffer[i] == ',') {
+			data[6][j+1] = '\0';
+			i++;
 			break;
+		}
 	}
-	
-	i++;
 	
 	for (j = 0; j < 10; j++) { /* ask size */
 		data[7][j] = buffer[i];
 		i++;
 		
-		if(buffer[i] == '\r')
+		if(buffer[i] == '\r') {
+			data[7][j+1] = '\0';
 			break;
+		}
 	}
 	
 	printf("Symbol: %s\n", data[0]);
@@ -143,6 +146,21 @@ int main(void) {
 	printf("Ask: %s\n", data[5]);
 	printf("Bid Size:%s\n", data[6]);
 	printf("Ask Size: %s\n", data[7]);
+}
+
+int main(void) {
+
+	int sd = socket_set_up();
+	char *symbol; 
+	static char buffer[1024];
+	//static char data[8][40]; /* parsed stock info */
+		
+	symbol = "msft";
+	
+	getStockInfo(sd, symbol, buffer);
+	
+	parseStockInfo(buffer);
+	
 	return 0;
 	
 }
