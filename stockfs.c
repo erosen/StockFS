@@ -153,9 +153,11 @@ void parseStockInfo(char *buffer) {
 	printf("Ask Size: %s\n", data[7]);
 }
 
-static const char *stockfs_str = "stockfs World!\n";
+static const char *stockfs_str = "Hello World!\n";
 static const char *stockfs_path = "/stockfs";
 
+/* If the path is the parent directory, report that it is a directory, 
+ * all other files are reported with a 4kb size */
 static int stockfs_getattr(const char *path, struct stat *stbuf) {
     int res = 0;
 
@@ -164,14 +166,12 @@ static int stockfs_getattr(const char *path, struct stat *stbuf) {
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 2;
     }
-    else if(strcmp(path, stockfs_path) == 0) {
+    else {
         stbuf->st_mode = S_IFREG | 0444;
         stbuf->st_nlink = 1;
-        stbuf->st_size = strlen(stockfs_str);
+        stbuf->st_size = 4096; /* 4kb file size */
     }
-    else
-        res = -ENOENT;
-
+    
     return res;
 }
 
@@ -192,6 +192,9 @@ static int stockfs_readdir(const char *path, void *buf,
 }
 
 static int stockfs_open(const char *path, struct fuse_file_info *fi) {
+    
+    
+    
     if(strcmp(path, stockfs_path) != 0)
         return -ENOENT;
 
@@ -200,13 +203,6 @@ static int stockfs_open(const char *path, struct fuse_file_info *fi) {
 
     return 0;
 }
-
-/*static int stockfs_close(const char *path, struct fuse_file_info *fi) {
-	
-	
-	
-	return 0;
-} */
 
 static int stockfs_read(const char *path, char *buf, 
 	size_t size, off_t offset, struct fuse_file_info *fi) {
@@ -226,18 +222,11 @@ static int stockfs_read(const char *path, char *buf,
     return size;
 }
 
-/*static int stockfs_creat() {
-	return 0;
-} */
-
 static struct fuse_operations stockfs_oper = {
     .getattr	= stockfs_getattr,
     .readdir	= stockfs_readdir,
     .open	= stockfs_open,
-//    .close	= stockfs_close,
     .read	= stockfs_read,
-   // .creat	= stockfs_creat,
-    
 };
 
 int main(int argc, char *argv[]) {
