@@ -150,6 +150,13 @@ void parseStockInfo(char *buffer) {
 
 static const char stockfs_buffer[1024];
 
+struct stock_files {
+	int used;
+	char buffer[1024];
+
+};
+
+struct stock_files table[128]; /* support up to 128 stocks */
 
 /* If the path is the parent directory, report that it is a directory, 
  * all other files are reported with a 4kb size */
@@ -200,6 +207,8 @@ static int stockfs_read(const char *path, char *buf,
     size_t len;
     (void) fi;
     
+    
+    
     len = strlen(stockfs_buffer);
     if (offset < len) {
         if (offset + size > len)
@@ -217,6 +226,15 @@ static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 
 static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) { 
 	
+	int i, index;
+	
+	for (i = 0; i <128; i++) {
+		if(table[i].used == 0)
+			index = i;
+			break;
+	}
+	
+	
 	
 	
 	return 0;
@@ -232,10 +250,13 @@ static struct fuse_operations stockfs_oper = {
 };
 
 int main(int argc, char *argv[]) {
+	
+	int i;
 
-	char *symbol; 
-		
-	symbol = "msft";
+	for (i = 0; i <128; i++) {
+		table[i].used = 0;
+	}
+	
 	
 	//getStockInfo(symbol, stockfs_buffer);
 	
