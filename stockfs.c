@@ -1,3 +1,8 @@
+/* Fuse based file system that displays stock ticker information */
+/* and keeps a list of favorited stocks                          */
+/* Created by Elie Rosen										 */
+/* April 14, 2012 												 */
+
 #define FUSE_USE_VERSION  26
 #include <fuse.h>
 #include <sys/socket.h>
