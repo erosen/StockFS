@@ -227,6 +227,7 @@ static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) { 
 	
 	int i, index;
+	char *pathadj;
 	
 	for (i = 0; i <128; i++) {
 		if(table[i].used == 0)
@@ -234,10 +235,11 @@ static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) {
 			break;
 	}
 	
+	strcpy(pathadj, path + 1); /* copy the path over, remove the first character */
+	
 	table[index].used = 1;
-	table[index].favorite = 1;
-	
-	
+	table[index].favorite = 1;	
+	table[index].symbol = pathadj;
 	
 	return 0;
 }
