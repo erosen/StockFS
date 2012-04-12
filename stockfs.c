@@ -46,8 +46,8 @@ char getStockInfo(char* symbol) {
 	
 }
 
-/* Parse the server data into tokens that translate to the required data */
-void parseStockInfo(char *buffer) {
+/* Parse the server data into tokens that translate to the required data and respond with stock information*/
+char parseStockInfo(char *buffer) {
 	int i, j;
 	char data[8][25];
 	
@@ -145,15 +145,34 @@ void parseStockInfo(char *buffer) {
 		}
 	}
 	
-	printf("Symbol: %s\n", data[0]);
-	printf("Company: %s\n", data[1]);
-	printf("Last Trade: %s\n", data[2]);
-	printf("Change: %s\n", data[3]);
-	printf("Bid: %s\n", data[4]);
-	printf("Ask: %s\n", data[5]);
-	printf("Bid Size:%s\n", data[6]);
-	printf("Ask Size: %s\n", data[7]);
-}
+	strcpy(buffer, "\0"); /* Clear out the buffer for return message */
+	
+	/* Check to see if there is a valid Bid if not stock is invalid */
+	if(strcmp(data[4], "N/A")) {
+		strcat(buffer, "Symbol: ");
+		strcat(buffer, data[0]);
+		strcat(buffer, "\nCompany: ");
+		strcat(buffer, data[1]);
+		strcat(buffer, "\nLast Trade: ");
+		strcat(buffer, data[2]);
+		strcat(buffer, "\nChange: ");
+		strcat(buffer, data[3]);
+		strcat(buffer, "\nBid: ");
+		strcat(buffer, data[4]);
+		strcat(buffer, "\nAsk: ");
+		strcat(buffer, data[5]);
+		strcat(buffer, "\nBid Size: ");
+		strcat(buffer, data[6]);
+		strcat(buffer, "\nAsk Size: ");
+		strcat(buffer, data[7]);
+		strcat(buffer, "\0");
+	}
+	else
+		strcat(buffer, "StockFS error: Not a valid stock");
+		
+	return *buffer;
+}	
+
 
 struct stock_files {
 	int favorite, used;
@@ -242,7 +261,7 @@ static int stockfs_read(const char *path, char *buf,
     
     
     
-  /* len = strlen(stockfs_buffer);
+	/*len = strlen(stockfs_buffer);
     if (offset < len) {
         if (offset + size > len)
             size = len - offset;
