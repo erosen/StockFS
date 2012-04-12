@@ -182,13 +182,19 @@ static int stockfs_readdir(const char *path, void *buf,
 		
     (void) offset;
     (void) fi;
+    int i;
 
     if(strcmp(path, "/") != 0)
         return -ENOENT;
-
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
-    //filler(buf, stockfs_path + 1, NULL, 0);
+        
+    filler(buf, ".", NULL, 0); /* default */
+    filler(buf, "..", NULL, 0); /* default */
+    
+    /* find any stock that is favorited and list it as an added file */
+    for(i = 0; i < 128; i++) {
+		if(table[i].favorite)
+			filler(buf, table[i].symbol, NULL, 0);
+	}
 
     return 0;
 }
