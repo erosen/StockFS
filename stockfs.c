@@ -221,6 +221,23 @@ static int stockfs_read(const char *path, char *buf,
 }
 
 static int stockfs_release(const char *path, struct fuse_file_info *fi) {
+	int i, index;
+	char *pathadj;
+	
+	strcpy(pathadj, path + 1); /* copy the path over, remove the first character */
+	
+	for(i = 0; i < 128; i++) {
+		if(strcmp(pathadj, table[i].symbol)) {
+			index = i;
+			break;
+		}	
+	}
+	
+	/* keep it used if the item is a favorite */
+	if(!table[index].favorite) {
+		table[index].used = 0;
+	}
+	
 	return 0;
 }
 
