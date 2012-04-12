@@ -9,10 +9,12 @@
 #include <errno.h>
 #include <fcntl.h>
 
-/* This function sets up the socket connection and returns the socket for later use */
-int socket_set_up() {
+/* Take in the socket and requested symbol, then output the data the server responds with */
+void getStockInfo(char* symbol, char *buffer) {
 	
-	int sd;
+	int bytes, sd;
+	char request[1024];
+	
 	struct sockaddr_in server;
 
 	sd = socket(AF_INET, SOCK_STREAM, 0);
@@ -22,16 +24,7 @@ int socket_set_up() {
 	server.sin_addr.s_addr = inet_addr("76.13.114.90"); /* download.finance.yahoo.com */
 	server.sin_port = htons(80);
 
-	int result = connect(sd, (struct sockaddr *) &server, sizeof(server));
-	
-	return sd;
-}
-
-/* Take in the socket and requested symbol, then output the data the server responds with */
-void getStockInfo(int sd, char* symbol, char *buffer) {
-	
-	int bytes;
-	char request[1024];
+	connect(sd, (struct sockaddr *) &server, sizeof(server));
 	
 	strcat(request, "GET /d/quotes.csv?s=");
 	strcat(request, symbol);				
@@ -41,6 +34,8 @@ void getStockInfo(int sd, char* symbol, char *buffer) {
 	bytes = recv(sd, buffer, 1023, 0);
 	printf("Read %d bytes...\n\n", bytes);
 	printf("%s\n", buffer);
+	
+	shutdown(sd, 0); /* shutdown the socket */
 	
 }
 
@@ -153,8 +148,8 @@ void parseStockInfo(char *buffer) {
 	printf("Ask Size: %s\n", data[7]);
 }
 
-static const char *stockfs_str = "Hello World!\n";
-static const char *stockfs_path = "/stockfs";
+static const char stockfs_buffer[1024];
+
 
 /* If the path is the parent directory, report that it is a directory, 
  * all other files are reported with a 4kb size */
@@ -186,7 +181,7 @@ static int stockfs_readdir(const char *path, void *buf,
 
     filler(buf, ".", NULL, 0);
     filler(buf, "..", NULL, 0);
-    filler(buf, stockfs_path + 1, NULL, 0);
+    //filler(buf, stockfs_path + 1, NULL, 0);
 
     return 0;
 }
@@ -194,10 +189,6 @@ static int stockfs_readdir(const char *path, void *buf,
 static int stockfs_open(const char *path, struct fuse_file_info *fi) {
     
     
-    
-    if(strcmp(path, stockfs_path) != 0)
-        return -ENOENT;
-
     if((fi->flags & 3) != O_RDONLY)
         return -EACCES;
 
@@ -208,18 +199,27 @@ static int stockfs_read(const char *path, char *buf,
 	size_t size, off_t offset, struct fuse_file_info *fi) {
     size_t len;
     (void) fi;
-    if(strcmp(path, stockfs_path) != 0)
-        return -ENOENT;
-
-    len = strlen(stockfs_str);
+    
+    len = strlen(stockfs_buffer);
     if (offset < len) {
         if (offset + size > len)
             size = len - offset;
-        memcpy(buf, stockfs_str + offset, size);
+        memcpy(buf, stockfs_buffer + offset, size);
     } else
         size = 0;
 
     return size;
+}
+
+static int stockfs_release(const char *path, struct fuse_file_info *fi) {
+	return 0;
+}
+
+static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) { 
+	
+	
+	
+	return 0;
 }
 
 static struct fuse_operations stockfs_oper = {
@@ -227,21 +227,20 @@ static struct fuse_operations stockfs_oper = {
     .readdir	= stockfs_readdir,
     .open	= stockfs_open,
     .read	= stockfs_read,
+    .release	= stockfs_release,
+    .mknod	= stockfs_mknod,
 };
 
 int main(int argc, char *argv[]) {
 
-	int sd = socket_set_up();
 	char *symbol; 
-	static char buffer[1024];
-	//static char data[8][40]; /* parsed stock info */
 		
 	symbol = "msft";
 	
-	getStockInfo(sd, symbol, buffer);
+	//getStockInfo(symbol, stockfs_buffer);
 	
-	parseStockInfo(buffer);
+	//parseStockInfo(buffer);
 	
-	return fuse_main(argc, argv, &stockfs_oper, NULL);;
+	return fuse_main(argc, argv, &stockfs_oper, NULL);
 	
 }
