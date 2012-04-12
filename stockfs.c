@@ -240,6 +240,15 @@ static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) {
 	return 0;
 }
 
+void stockfs_init(struct  fuse_conn_info *conn) {
+	int i;
+
+	for (i = 0; i <128; i++) {
+		table[i].used = 0;
+	}
+	
+}
+
 static struct fuse_operations stockfs_oper = {
     .getattr	= stockfs_getattr,
     .readdir	= stockfs_readdir,
@@ -247,15 +256,10 @@ static struct fuse_operations stockfs_oper = {
     .read	= stockfs_read,
     .release	= stockfs_release,
     .mknod	= stockfs_mknod,
+    .init	= stockfs_init,
 };
 
 int main(int argc, char *argv[]) {
-	
-	int i;
-
-	for (i = 0; i <128; i++) {
-		table[i].used = 0;
-	}
 	
 	
 	//getStockInfo(symbol, stockfs_buffer);
