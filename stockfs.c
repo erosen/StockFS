@@ -195,10 +195,32 @@ static int stockfs_readdir(const char *path, void *buf,
 
 static int stockfs_open(const char *path, struct fuse_file_info *fi) {
     
-    
-    if((fi->flags & 3) != O_RDONLY)
+    int i, index = 0;
+    char *pathadj;
+	
+	if((fi->flags & 3) != O_RDONLY)
         return -EACCES;
-
+        
+    strcpy(pathadj, path + 1); /* copy the path over, remove the first character */
+    
+    for(i = 0; i < 128; i++) {
+		if(strcmp(pathadj, table[i].symbol)) {
+			index = i;
+			break;
+		}	
+	}
+	
+	if(!index) { /* if the symbol is not found, find the next open place */
+		for (i = 0; i <128; i++) {
+			if(table[i].used == 0)
+				index = i;
+				break;
+		}
+	}
+	
+	table[index].used = 1;
+	table[index].symbol = pathadj;
+	
     return 0;
 }
 
@@ -282,12 +304,7 @@ static struct fuse_operations stockfs_oper = {
 };
 
 int main(int argc, char *argv[]) {
-	
-	
-	//getStockInfo(symbol, stockfs_buffer);
-	
-	//parseStockInfo(buffer);
-	
+		
 	return fuse_main(argc, argv, &stockfs_oper, NULL);
 	
 }
