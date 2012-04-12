@@ -10,10 +10,10 @@
 #include <fcntl.h>
 
 /* Take in the socket and requested symbol, then output the data the server responds with */
-void getStockInfo(char* symbol, char *buffer) {
+char getStockInfo(char* symbol) {
 	
 	int bytes, sd;
-	char request[1024];
+	char request[1024], stockfs_buffer[1024];
 	
 	struct sockaddr_in server;
 
@@ -31,11 +31,13 @@ void getStockInfo(char* symbol, char *buffer) {
 	strcat(request, "&f=snl1c1bab6a5 HTTP/1.0\nHOST: download.finance.yahoo.com\n\n");
 	bytes = send(sd, request, strlen(request), 0);
 	printf("Send %d bytes...\n", bytes);
-	bytes = recv(sd, buffer, 1023, 0);
+	bytes = recv(sd, stockfs_buffer, 1023, 0);
 	printf("Read %d bytes...\n\n", bytes);
-	printf("%s\n", buffer);
+	printf("%s\n", stockfs_buffer);
 	
 	shutdown(sd, 0); /* shutdown the socket */
+	
+	return *stockfs_buffer;
 	
 }
 
@@ -148,11 +150,9 @@ void parseStockInfo(char *buffer) {
 	printf("Ask Size: %s\n", data[7]);
 }
 
-static const char stockfs_buffer[1024];
-
 struct stock_files {
-	int used;
-	char buffer[1024];
+	int favorite, used;
+	char *symbol;
 
 };
 
@@ -209,12 +209,12 @@ static int stockfs_read(const char *path, char *buf,
     
     
     
-    len = strlen(stockfs_buffer);
+  /* len = strlen(stockfs_buffer);
     if (offset < len) {
         if (offset + size > len)
             size = len - offset;
         memcpy(buf, stockfs_buffer + offset, size);
-    } else
+    } else */
         size = 0;
 
     return size;
@@ -234,17 +234,20 @@ static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) {
 			break;
 	}
 	
+	table[index].used = 1;
+	table[index].favorite = 1;
 	
 	
 	
 	return 0;
 }
-
-void stockfs_init(struct  fuse_conn_info *conn) {
+/* When file system initilizes, create an empty table for later use */
+void* stockfs_init() {
 	int i;
 
 	for (i = 0; i <128; i++) {
 		table[i].used = 0;
+		table[i].favorite = 0;
 	}
 	
 }
