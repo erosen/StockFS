@@ -15,10 +15,10 @@
 #include <fcntl.h>
 
 /* Take in the socket and requested symbol, then output the data the server responds with */
-char getStockInfo(char* symbol) {
+static char *getStockInfo(const char *symbol) {
 	
 	int bytes, sd;
-	char request[1024], stockfs_buffer[1024];
+	char request[1024], temp[1024], stockfs_buffer[1024] = "\0";
 	
 	struct sockaddr_in server;
 
@@ -36,18 +36,19 @@ char getStockInfo(char* symbol) {
 	strcat(request, "&f=snl1c1bab6a5 HTTP/1.0\nHOST: download.finance.yahoo.com\n\n");
 	bytes = send(sd, request, strlen(request), 0);
 	printf("Send %d bytes...\n", bytes);
-	bytes = recv(sd, stockfs_buffer, 1023, 0);
+	bytes = recv(sd, temp, 1023, 0);
 	printf("Read %d bytes...\n\n", bytes);
-	printf("%s\n", stockfs_buffer);
+	printf("%s\n", temp);
 	
 	shutdown(sd, 0); /* shutdown the socket */
 	
-	return *stockfs_buffer;
+	
+	return strcat(stockfs_buffer, temp);
 	
 }
 
 /* Parse the server data into tokens that translate to the required data and respond with stock information*/
-char parseStockInfo(char *buffer) {
+static char *parseStockInfo(char *buffer) {
 	int i, j;
 	char data[8][25];
 	
@@ -165,14 +166,12 @@ char parseStockInfo(char *buffer) {
 		strcat(buffer, data[6]);
 		strcat(buffer, "\nAsk Size: ");
 		strcat(buffer, data[7]);
-		strcat(buffer, "\0");
 	}
 	else
 		strcat(buffer, "StockFS error: Not a valid stock");
 		
-	return *buffer;
+	return strcat(buffer, "\0");
 }	
-
 
 struct stock_files {
 	int favorite, used;
@@ -256,17 +255,22 @@ static int stockfs_open(const char *path, struct fuse_file_info *fi) {
 
 static int stockfs_read(const char *path, char *buf, 
 	size_t size, off_t offset, struct fuse_file_info *fi) {
+    
     size_t len;
     (void) fi;
+    char *tmpbuffer, *stockfs_buffer, *symbol;
     
-    
-    
-	/*len = strlen(stockfs_buffer);
+	strcpy(symbol, path + 1); /* copy the path over, remove the first character */
+	
+    strcpy(tmpbuffer, getStockInfo(symbol));
+    strcpy(stockfs_buffer, parseStockInfo(tmpbuffer));
+ 
+	len = strlen(stockfs_buffer);
     if (offset < len) {
         if (offset + size > len)
             size = len - offset;
         memcpy(buf, stockfs_buffer + offset, size);
-    } else */
+    } else 
         size = 0;
 
     return size;
