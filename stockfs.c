@@ -35,10 +35,10 @@ static char *getStockInfo(const char *symbol) {
 	strcat(request, symbol);				
 	strcat(request, "&f=snl1c1bab6a5 HTTP/1.0\nHOST: download.finance.yahoo.com\n\n");
 	bytes = send(sd, request, strlen(request), 0);
-	printf("Send %d bytes...\n", bytes);
+	//printf("Send %d bytes...\n", bytes);
 	bytes = recv(sd, temp, 1023, 0);
-	printf("Read %d bytes...\n\n", bytes);
-	printf("%s\n", temp);
+	//printf("Read %d bytes...\n\n", bytes);
+	//printf("%s\n", temp);
 	
 	shutdown(sd, 0); /* shutdown the socket */
 	
@@ -149,7 +149,7 @@ static char *parseStockInfo(char *buffer) {
 	strcpy(buffer, "\0"); /* Clear out the buffer for return message */
 	
 	/* Check to see if there is a valid Bid if not stock is invalid */
-	if(strcmp(data[4], "N/A")) {
+	if(!strcmp(data[4], "N/A")) {
 		strcat(buffer, "Symbol: ");
 		strcat(buffer, data[0]);
 		strcat(buffer, "\nCompany: ");
@@ -177,9 +177,7 @@ struct stock_files {
 	int favorite, used;
 	char *symbol;
 
-};
-
-struct stock_files table[128]; /* support up to 128 stocks */
+} table[128]; /* support up to 128 stocks */
 
 /* If the path is the parent directory, report that it is a directory, 
  * all other files are reported with a 4kb size */
@@ -232,15 +230,15 @@ static int stockfs_open(const char *path, struct fuse_file_info *fi) {
         
     strcpy(pathadj, path + 1); /* copy the path over, remove the first character */
     
-    for(i = 0; i < 128; i++) {
+	for(i = 0; i < 128; i++) {
 		if(strcmp(pathadj, table[i].symbol)) {
 			index = i;
 			break;
 		}	
-	}
+	} 
 	
-	if(!index) { /* if the symbol is not found, find the next open place */
-		for (i = 0; i <128; i++) {
+	if(!index) {   /* if the symbol is not found, find the next open place */
+		for (i = 0; i < 128; i++) {
 			if(table[i].used == 0)
 				index = i;
 				break;
@@ -248,7 +246,7 @@ static int stockfs_open(const char *path, struct fuse_file_info *fi) {
 	}
 	
 	table[index].used = 1;
-	table[index].symbol = pathadj;
+	table[index].symbol = pathadj; 
 	
     return 0;
 }
@@ -260,16 +258,17 @@ static int stockfs_read(const char *path, char *buf,
     (void) fi;
     char *tmpbuffer, *stockfs_buffer, *symbol;
     
-	strcpy(symbol, path + 1); /* copy the path over, remove the first character */
+	//strcpy(symbol, (path + 1) + offset); /* copy the path over, remove the first character */
 	
-    strcpy(tmpbuffer, getStockInfo(symbol));
-    strcpy(stockfs_buffer, parseStockInfo(tmpbuffer));
- 
-	len = strlen(stockfs_buffer);
+    //strcpy(tmpbuffer, getStockInfo(path + 1));
+    //strcpy(stockfs_buffer, parseStockInfo(tmpbuffer));
+    
+	stockfs_buffer = "hello world";
+	len = strlen(path);
     if (offset < len) {
         if (offset + size > len)
             size = len - offset;
-        memcpy(buf, stockfs_buffer + offset, size);
+        memcpy(buf, path + offset, size);
     } else 
         size = 0;
 
@@ -302,7 +301,7 @@ static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) {
 	int i, index;
 	char *pathadj;
 	
-	for (i = 0; i <128; i++) {
+	for (i = 0; i < 128; i++) {
 		if(table[i].used == 0)
 			index = i;
 			break;
@@ -317,14 +316,14 @@ static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) {
 	return 0;
 }
 /* When file system initilizes, create an empty table for later use */
-void* stockfs_init() {
+static void *stockfs_init() {
+	
 	int i;
-
-	for (i = 0; i <128; i++) {
+	for (i = 0; i < 128; i++) {
 		table[i].used = 0;
 		table[i].favorite = 0;
+		table[i].symbol = "\0";
 	}
-	
 }
 
 static struct fuse_operations stockfs_oper = {
@@ -332,7 +331,7 @@ static struct fuse_operations stockfs_oper = {
     .readdir	= stockfs_readdir,
     .open	= stockfs_open,
     .read	= stockfs_read,
-    .release	= stockfs_release,
+   // .release	= stockfs_release,
     .mknod	= stockfs_mknod,
     .init	= stockfs_init,
 };
@@ -340,5 +339,7 @@ static struct fuse_operations stockfs_oper = {
 int main(int argc, char *argv[]) {
 		
 	return fuse_main(argc, argv, &stockfs_oper, NULL);
+	
+	
 	
 }
