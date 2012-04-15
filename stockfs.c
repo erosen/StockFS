@@ -13,12 +13,13 @@
 #include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h> /* get system time */
 
 /* Take in the socket and requested symbol, then output the data the server responds with */
-static char *getStockInfo(const char *symbol) {
+static char *getStockInfo(char *symbol) {
 	
-	int bytes, sd;
-	char request[1024], temp[1024], stockfs_buffer[1024] = "\0";
+	int bytes, sd, i = 0;
+	char request[1024] = "\0", temp[1024], stockfs_buffer[1024] = "\0";
 	
 	struct sockaddr_in server;
 
@@ -30,10 +31,10 @@ static char *getStockInfo(const char *symbol) {
 	server.sin_port = htons(80);
 
 	connect(sd, (struct sockaddr *) &server, sizeof(server));
-	
+
 	strcat(request, "GET /d/quotes.csv?s=");
 	strcat(request, symbol);				
-	strcat(request, "&f=snl1c1bab6a5 HTTP/1.0\nHOST: download.finance.yahoo.com\n\n");
+	strcat(request, "&f=snl1c1bab6a5 HTTP/1.0\nHOST: download.finance.yahoo.com\n\n\0");
 	bytes = send(sd, request, strlen(request), 0);
 	//printf("Send %d bytes...\n", bytes);
 	bytes = recv(sd, temp, 1023, 0);
@@ -42,9 +43,7 @@ static char *getStockInfo(const char *symbol) {
 	
 	shutdown(sd, 0); /* shutdown the socket */
 	
-	
-	return strcat(stockfs_buffer, temp);
-	
+	return 	strcat(stockfs_buffer, temp);
 }
 
 /* Parse the server data into tokens that translate to the required data and respond with stock information*/
@@ -149,7 +148,7 @@ static char *parseStockInfo(char *buffer) {
 	strcpy(buffer, "\0"); /* Clear out the buffer for return message */
 	
 	/* Check to see if there is a valid Bid if not stock is invalid */
-	if(!strcmp(data[4], "N/A")) {
+	if(strcmp(data[4], "N/A")) {
 		strcat(buffer, "Symbol: ");
 		strcat(buffer, data[0]);
 		strcat(buffer, "\nCompany: ");
@@ -167,16 +166,18 @@ static char *parseStockInfo(char *buffer) {
 		strcat(buffer, "\nAsk Size: ");
 		strcat(buffer, data[7]);
 	}
-	else
-		strcat(buffer, "StockFS error: Not a valid stock");
+	else {
+		strcat(buffer, "stockfs: ");
+		strcat(buffer, data[0]);
+		strcat(buffer, " is not a valid stock");
+	}
 		
-	return strcat(buffer, "\0");
+	return strcat(buffer, "\n\0");
 }	
 
 struct stock_files {
 	int favorite, used;
 	char *symbol;
-
 } table[128]; /* support up to 128 stocks */
 
 /* If the path is the parent directory, report that it is a directory, 
@@ -190,9 +191,14 @@ static int stockfs_getattr(const char *path, struct stat *stbuf) {
         stbuf->st_nlink = 2;
     }
     else {
-        stbuf->st_mode = S_IFREG | 0444;
+        stbuf->st_mode = S_IFREG | 0666;
         stbuf->st_nlink = 1;
+        stbuf->st_uid = getuid();
+        stbuf->st_gid = getgid();
         stbuf->st_size = 4096; /* 4kb file size */
+        stbuf->st_atime = time(NULL);
+        stbuf->st_mtime = stbuf->st_atime;
+        stbuf->st_ctime = stbuf->st_atime;    
     }
     
     return res;
@@ -212,41 +218,40 @@ static int stockfs_readdir(const char *path, void *buf,
     filler(buf, "..", NULL, 0); /* default */
     
     /* find any stock that is favorited and list it as an added file */
-    for(i = 0; i < 128; i++) {
-		if(table[i].favorite)
-			filler(buf, table[i].symbol, NULL, 0);
+	for(i = 0; i < 128; i++) {
+		if(table[i].favorite) {
+			filler(buf, strcpy(table[0].symbol, table[0].symbol), NULL, 0);
+		}
 	}
-
+	
     return 0;
 }
 
 static int stockfs_open(const char *path, struct fuse_file_info *fi) {
     
-    int i, index = 0;
+    int i, index = -1;
     char *pathadj;
-	
-	if((fi->flags & 3) != O_RDONLY)
-        return -EACCES;
         
     strcpy(pathadj, path + 1); /* copy the path over, remove the first character */
     
-	for(i = 0; i < 128; i++) {
-		if(strcmp(pathadj, table[i].symbol)) {
+	for(i = 0; i < 128; i++) { /* try to find existing entry */
+		if(strcmp(path+1, table[i].symbol)) {
 			index = i;
 			break;
 		}	
 	} 
 	
-	if(!index) {   /* if the symbol is not found, find the next open place */
+	if(index == -1) {   /* if the symbol is not found, find the next open place */
 		for (i = 0; i < 128; i++) {
-			if(table[i].used == 0)
+			if(table[i].used == 0) {
 				index = i;
 				break;
+			}
 		}
 	}
 	
 	table[index].used = 1;
-	table[index].symbol = pathadj; 
+	table[index].symbol = strcpy(pathadj, path + 1);
 	
     return 0;
 }
@@ -256,19 +261,17 @@ static int stockfs_read(const char *path, char *buf,
     
     size_t len;
     (void) fi;
-    char *tmpbuffer, *stockfs_buffer, *symbol;
     
-	//strcpy(symbol, (path + 1) + offset); /* copy the path over, remove the first character */
+	strcpy(buf, path + 1); /* copy the path over, remove the first character */
 	
-    //strcpy(tmpbuffer, getStockInfo(path + 1));
-    //strcpy(stockfs_buffer, parseStockInfo(tmpbuffer));
+    strcpy(buf, getStockInfo(buf));
+    strcpy(buf, parseStockInfo(buf));
     
-	stockfs_buffer = "hello world";
-	len = strlen(path);
+	len = strlen(buf);
     if (offset < len) {
         if (offset + size > len)
             size = len - offset;
-        memcpy(buf, path + offset, size);
+        memcpy(buf, buf + offset, size);
     } else 
         size = 0;
 
@@ -276,7 +279,7 @@ static int stockfs_read(const char *path, char *buf,
 }
 
 static int stockfs_release(const char *path, struct fuse_file_info *fi) {
-	int i, index;
+	int i, index = 0;
 	char *pathadj;
 	
 	strcpy(pathadj, path + 1); /* copy the path over, remove the first character */
@@ -291,7 +294,7 @@ static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 	/* keep it used if the item is a favorite */
 	if(!table[index].favorite) {
 		table[index].used = 0;
-	}
+	} 
 	
 	return 0;
 }
@@ -326,14 +329,19 @@ static void *stockfs_init() {
 	}
 }
 
+static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
+		return 0;
+}
+
 static struct fuse_operations stockfs_oper = {
     .getattr	= stockfs_getattr,
     .readdir	= stockfs_readdir,
     .open	= stockfs_open,
     .read	= stockfs_read,
-   // .release	= stockfs_release,
+    .release	= stockfs_release,
     .mknod	= stockfs_mknod,
     .init	= stockfs_init,
+    .utimens	= stockfs_utimens,
 };
 
 int main(int argc, char *argv[]) {
