@@ -258,7 +258,7 @@ static int stockfs_getattr(const char *path, struct stat *stbuf) {
         stbuf->st_nlink = 2;
     }
     else {
-        stbuf->st_mode = S_IFREG | 0666;
+        stbuf->st_mode = S_IFREG | 0444;
         stbuf->st_nlink = 1;
         stbuf->st_uid = getuid();
         stbuf->st_gid = getgid();
@@ -353,10 +353,10 @@ static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
 	char *symbol = "\0";
 	
 	symbol = getStockInfo((char *)path + 1);
-	symbol = parseStockSymbol(symbol);
+	strcpy(symbol, parseStockSymbol(symbol));
 	
 	index = getNextFavorite(symbol);
-	
+	symbol = strdup(symbol);
 	favorite_table[index].flag = 1;
 	favorite_table[index].symbol = symbol;	
 		
