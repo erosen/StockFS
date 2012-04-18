@@ -387,6 +387,27 @@ static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
 	return 0;
 }
 
+/* Remove a favorite from the list */
+static int stockfs_unlink(const char *path) {
+	int index;
+	char *symbol = "\0";
+	
+	symbol = getStockInfo((char *)path + 1);
+	strcpy(symbol, parseStockSymbol(symbol));
+	symbol = strdup(symbol);
+	
+	index = getFavoriteIndex(symbol);
+	
+	if(index == -1)
+		return -ENOENT;
+	else {
+		favorite_table[index].flag = 0;
+		favorite_table[index].symbol = "\0";
+	}
+	
+	return 0;
+}
+
 /* No files are written but a write request can be handled */
 static int stockfs_write(const char * path, const char *fill, size_t size, off_t offset, struct fuse_file_info *fi) {
 	(void) fi;
@@ -418,6 +439,7 @@ static struct fuse_operations stockfs_oper = {
     .open	= stockfs_open,
     .read	= stockfs_read,
     .release	= stockfs_release,
+    .unlink	= stockfs_unlink,
     .utimens	= stockfs_utimens,
     .write	= stockfs_write,
     .init	= stockfs_init,
