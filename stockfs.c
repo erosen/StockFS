@@ -18,17 +18,17 @@
 #include <arpa/inet.h>
 
 typedef struct {
-	int favorite;
-	const char *symbol;
+	int favorite, used;
+	char *symbol;
 } stock_files; 
 
 static stock_files table[128]; /* support up to 128 stocks */
 
-int getIndex(const char *path) {
+int getIndex(const char *buf) {
 	
 	int i, index = -1;
 	for(i = 0; i < 128; i++) { /* try to find existing entry */
-		if(strcmp(path, table[i].symbol) == 0) {
+		if(strcmp(buf, table[i].symbol) == 0) {
 			index = i;
 			break;
 		}
@@ -41,7 +41,7 @@ int getNextPlace() {
 	
 	int i, index;
 	for (i = 0; i < 128; i++) {
-		if(table[i].favorite == 0) {
+		if(table[i].used == 0) {
 			index = i;
 			break;
 		}
@@ -207,6 +207,34 @@ static char *parseStockInfo(char *buffer) {
 	return strcat(buffer, "\n\0");
 }	
 
+static char *parseStockSymbol(char *buffer) {
+	
+	int i, j;
+	char data[8][25];
+	
+	for (i = 0; i < 1023; i++) { /* find start of string */
+		if ( (buffer[i] == '\r') && (buffer[i+1] == '\n') && (buffer[i+2] == '\r') && (buffer[i+3] == '\n') ) {
+			i += 5;
+			break;
+		}
+	}
+
+	for (j = 0; j < 8; j++) { /* Stock symbol */
+		data[0][j] = buffer[i];
+		i++;
+		
+		if (buffer[i] == '"') {
+			data[0][j+1] = '\0';
+			i+=3;
+			break;
+		}
+	}
+	
+	strcpy(buffer, "\0"); /* Clear out the buffer for return message */
+		
+	return strcat(buffer, data[0]);
+}	
+
 /* If the path is the parent directory, report that it is a directory, 
  * all other files are reported with a 4kb size */
 static int stockfs_getattr(const char *path, struct stat *stbuf) {
@@ -253,11 +281,18 @@ static int stockfs_readdir(const char *path, void *buf,
 	
 static int stockfs_open(const char *path, struct fuse_file_info *fi) {
     
-	//int index;
-
-	//index = getNextPlace();
+	int index;
+	char *symbol = getStockInfo((char *)path + 1);
 	
-	//table[index].symbol = (path + 1);
+	symbol = parseStockSymbol(symbol);
+	
+	index = getIndex(symbol);
+	
+	if(index == -1)
+		index = getNextPlace();
+	
+	table[index].used = 1;
+	table[index].symbol = symbol;
 	
     return 0;
 }
@@ -286,21 +321,22 @@ static int stockfs_read(const char *path, char *buf,
 
 static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 	
-	//int index;
+	int index;
+	char *symbol = getStockInfo((char *)path + 1);
 	
-	//index = getIndex(path);
+	symbol = parseStockSymbol(symbol);
 	
-	//table[index].used = 0;
+	index = getIndex(symbol);
+	
+	if(!table[index].favorite)
+		table[index].symbol = "\0";
+		
+	table[index].used = 0;
 
 	return 0;
 }
 
 static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) { 
-	
-	//int index;
-	//index = getIndex(path);
-	
-	//table[index].favorite = 1;	
 	
 	return 0;
 }
@@ -310,9 +346,9 @@ void *stockfs_init() {
 	
 	int i;
 	for (i = 0; i < 128; i++) {
-		//table[i].used = 0;
+		table[i].used = 0;
 		table[i].favorite = 0;
-		//table[i].symbol = "\0";
+		table[i].symbol = "\0";
 	}
 	
 	return NULL;
@@ -321,16 +357,18 @@ void *stockfs_init() {
 static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
 
 	int index;
+	char *buf = getStockInfo((char *)path + 1);
 	
-   // index = getIndex(path + 1);
+	buf = parseStockSymbol(buf);
+		
+   	index = getIndex(buf);
 	
-	//if(index == -1)   /* if the symbol is not found, find the next open place */
-	index = getNextPlace();
-	
-	//table[index].used = 1;		
-	//table[index].favorite = 1;	
-	table[index].symbol = (path + 1);
-	
+	if(index == -1)   /* if the symbol is not found, find the next open place */
+		index = getNextPlace();
+			
+	table[index].favorite = 1;	
+	table[index].symbol = buf;
+		
 	return 0;
 }
 	
