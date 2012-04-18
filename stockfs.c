@@ -319,7 +319,7 @@ static int stockfs_open(const char *path, struct fuse_file_info *fi) {
 	
 	symbol = parseStockSymbol(symbol);
 	
-	index = getIndex(symbol);
+	index = getUseIndex(symbol);
 	
 	if(index == -1)
 		index = getNextUse();
@@ -362,7 +362,7 @@ static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 	
 	symbol = parseStockSymbol(symbol);
 	
-	index = getIndex(symbol);
+	index = getUseIndex(symbol);
 	
 	use_table[index].flag = 0;
 	use_table[index].symbol = "\0";
@@ -387,6 +387,16 @@ static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
 	return 0;
 }
 
+/* No files are written but a write request can be handled */
+static int stockfs_write(const char * path, const char *fill, size_t size, off_t offset, struct fuse_file_info *fi) {
+	(void) fi;
+	(void) offset;
+	(void) fill;
+	(void) size;
+	
+	return 0;
+}
+	
 /* When file system initilizes, initialize the tables for search ability */
 void *stockfs_init() {
 	
@@ -409,6 +419,7 @@ static struct fuse_operations stockfs_oper = {
     .read	= stockfs_read,
     .release	= stockfs_release,
     .utimens	= stockfs_utimens,
+    .write	= stockfs_write,
     .init	= stockfs_init,
 };
 
