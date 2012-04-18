@@ -24,7 +24,8 @@ typedef struct {
 
 stock_files use_table[128], favorite_table[128]; /* support up to 128 stocks */
 
-int getIndex(const char *buf) {
+/* Find the next slot available in the use table */
+int getUseIndex(const char *buf) {
 	
 	int i, index = -1;
 	for(i = 0; i < 128; i++) { /* try to find existing entry */
@@ -37,6 +38,21 @@ int getIndex(const char *buf) {
 	return index;
 }
 
+/* Find the next slot available in the favorite table */
+int getFavoriteIndex(const char *buf) {
+	
+	int i, index = -1;
+	for(i = 0; i < 128; i++) { /* try to find existing entry */
+		if(strcmp(buf, favorite_table[i].symbol) == 0) {
+			index = i;
+			break;
+		}
+	}
+	
+	return index;
+}
+
+/* Find the next slot available in the use table */
 int getNextUse() {
 	
 	int i, index;
@@ -50,6 +66,7 @@ int getNextUse() {
 	return index;
 }	
 
+/* Find the next slot available in the favorite table */
 int getNextFavorite() {
 	
 	int i, index;
@@ -62,6 +79,7 @@ int getNextFavorite() {
 	
 	return index;
 }
+
 /* Take in the socket and requested symbol, then output the data the server responds with */
 static char *getStockInfo(char *symbol) {
 	
@@ -219,6 +237,7 @@ static char *parseStockInfo(char *buffer) {
 	return strcat(buffer, "\n\0");
 }	
 
+/* Parse only the stock symbol for storage */
 static char *parseStockSymbol(char *buffer) {
 	
 	int i, j;
@@ -271,6 +290,7 @@ static int stockfs_getattr(const char *path, struct stat *stbuf) {
     return res;
 }
 
+/* List all of the favorite stocks */
 static int stockfs_readdir(const char *path, void *buf, 
 	fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
 		
@@ -290,7 +310,8 @@ static int stockfs_readdir(const char *path, void *buf,
 	
     return 0;
 }
-	
+
+/* Mark a stock as in use and search to see if it is being used already */
 static int stockfs_open(const char *path, struct fuse_file_info *fi) {
     
 	int index;
@@ -310,6 +331,7 @@ static int stockfs_open(const char *path, struct fuse_file_info *fi) {
     return 0;
 }
 
+/* Display parsed information about the stock, also show error if it is not a stock */
 static int stockfs_read(const char *path, char *buf, 
 	size_t size, off_t offset, struct fuse_file_info *fi) {
     
@@ -332,6 +354,7 @@ static int stockfs_read(const char *path, char *buf,
     return size;
 }
 
+/* Mark the stock as unused when finished and clear the symbol value */
 static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 	
 	int index;
@@ -347,6 +370,7 @@ static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 	return 0;
 }
 
+/* Normally used to set the time but instead this is used to add a stock to the favorites list */
 static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
 
 	int index;
@@ -354,16 +378,16 @@ static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
 	
 	symbol = getStockInfo((char *)path + 1);
 	strcpy(symbol, parseStockSymbol(symbol));
+	symbol = strdup(symbol);
 	
 	index = getNextFavorite(symbol);
-	symbol = strdup(symbol);
 	favorite_table[index].flag = 1;
 	favorite_table[index].symbol = symbol;	
 		
 	return 0;
 }
 
-/* When file system initilizes, create an empty table for later use */
+/* When file system initilizes, initialize the tables for search ability */
 void *stockfs_init() {
 	
 	int i;
@@ -376,7 +400,8 @@ void *stockfs_init() {
 	
 	return NULL;
 }
-	
+
+/* List of valid operations that fuse can interpret and handle */
 static struct fuse_operations stockfs_oper = {
     .getattr	= stockfs_getattr,
     .readdir	= stockfs_readdir,
