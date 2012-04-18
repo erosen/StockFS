@@ -18,17 +18,17 @@
 #include <arpa/inet.h>
 
 typedef struct {
-	int favorite, used;
+	int flag;
 	char *symbol;
 } stock_files; 
 
-static stock_files table[128]; /* support up to 128 stocks */
+stock_files use_table[128], favorite_table[128]; /* support up to 128 stocks */
 
 int getIndex(const char *buf) {
 	
 	int i, index = -1;
 	for(i = 0; i < 128; i++) { /* try to find existing entry */
-		if(strcmp(buf, table[i].symbol) == 0) {
+		if(strcmp(buf, use_table[i].symbol) == 0) {
 			index = i;
 			break;
 		}
@@ -37,11 +37,11 @@ int getIndex(const char *buf) {
 	return index;
 }
 
-int getNextPlace() {
+int getNextUse() {
 	
 	int i, index;
 	for (i = 0; i < 128; i++) {
-		if(table[i].used == 0) {
+		if(use_table[i].flag == 0) {
 			index = i;
 			break;
 		}
@@ -50,6 +50,18 @@ int getNextPlace() {
 	return index;
 }	
 
+int getNextFavorite() {
+	
+	int i, index;
+	for (i = 0; i < 128; i++) {
+		if(favorite_table[i].flag == 0) {
+			index = i;
+			break;
+		}
+	}
+	
+	return index;
+}
 /* Take in the socket and requested symbol, then output the data the server responds with */
 static char *getStockInfo(char *symbol) {
 	
@@ -231,8 +243,8 @@ static char *parseStockSymbol(char *buffer) {
 	}
 	
 	strcpy(buffer, "\0"); /* Clear out the buffer for return message */
-		
-	return strcat(buffer, data[0]);
+	strcat(buffer, data[0]);
+	return buffer;
 }	
 
 /* If the path is the parent directory, report that it is a directory, 
@@ -271,8 +283,8 @@ static int stockfs_readdir(const char *path, void *buf,
     
     /* find any stock that is favorited and list it as an added file */
 	for(i = 0; i < 128; i++) {
-		if(table[i].favorite == 1) {
-			filler(buf, table[i].symbol, NULL, 0);
+		if(favorite_table[i].flag == 1) {
+			filler(buf, favorite_table[i].symbol, NULL, 0);
 		}
 	}
 	
@@ -289,10 +301,11 @@ static int stockfs_open(const char *path, struct fuse_file_info *fi) {
 	index = getIndex(symbol);
 	
 	if(index == -1)
-		index = getNextPlace();
+		index = getNextUse();
 	
-	table[index].used = 1;
-	table[index].symbol = symbol;
+	use_table[index].flag = 1;
+	use_table[index].symbol = symbol;
+	
 	
     return 0;
 }
@@ -328,16 +341,25 @@ static int stockfs_release(const char *path, struct fuse_file_info *fi) {
 	
 	index = getIndex(symbol);
 	
-	if(!table[index].favorite)
-		table[index].symbol = "\0";
-		
-	table[index].used = 0;
+	use_table[index].flag = 0;
+	use_table[index].symbol = "\0";
 
 	return 0;
 }
 
-static int stockfs_mknod(const char *path, mode_t mode, dev_t dev) { 
+static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
+
+	int index;
+	char *symbol = "\0";
 	
+	symbol = getStockInfo((char *)path + 1);
+	symbol = parseStockSymbol(symbol);
+	
+	index = getNextFavorite(symbol);
+	
+	favorite_table[index].flag = 1;
+	favorite_table[index].symbol = symbol;	
+		
 	return 0;
 }
 
@@ -346,30 +368,13 @@ void *stockfs_init() {
 	
 	int i;
 	for (i = 0; i < 128; i++) {
-		table[i].used = 0;
-		table[i].favorite = 0;
-		table[i].symbol = "\0";
+		use_table[i].flag = 0;
+		use_table[i].symbol = "\0";
+		favorite_table[i].flag = 0;
+		favorite_table[i].symbol = "\0";
 	}
 	
 	return NULL;
-}
-
-static int stockfs_utimens(const char *path, const struct timespec ts[2]) {
-
-	int index;
-	char *buf = getStockInfo((char *)path + 1);
-	
-	buf = parseStockSymbol(buf);
-		
-   	index = getIndex(buf);
-	
-	if(index == -1)   /* if the symbol is not found, find the next open place */
-		index = getNextPlace();
-			
-	table[index].favorite = 1;	
-	table[index].symbol = buf;
-		
-	return 0;
 }
 	
 static struct fuse_operations stockfs_oper = {
@@ -378,9 +383,8 @@ static struct fuse_operations stockfs_oper = {
     .open	= stockfs_open,
     .read	= stockfs_read,
     .release	= stockfs_release,
-    .mknod	= stockfs_mknod,
-    .init	= stockfs_init,
     .utimens	= stockfs_utimens,
+    .init	= stockfs_init,
 };
 
 int main(int argc, char *argv[]) {
