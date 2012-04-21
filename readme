@@ -1,0 +1,45 @@
+198:416 - Code Assignment 3 - Stock File System
+Authors: Elie Rosen
+
+How it works
+------------
+Through use of File System in User Space (FUSE - HTTP://fuse.sourceforge.net/) the user can get real time stock information by opening pseudo files which are really just the selected stocks. The user can also add stocks to a favorites list.
+
+Sockets
+--------
+Through use of the socket library a connection is made to download.finance.yahoo.com and then a request is made for the given stock ticker symbol. In return the server returns a buffer containning the HTTP requested message along with the content from the yahoo stocks api.
+
+FUSE
+----
+In FUSE the following file system operations were implemented:
+*getattr() - function that sets default attributes to the "files" so that the system see's them as real
+*readdir() - runs through table of favorite stocks and displays all of the stocks on the list
+*open() - sets the used flag to 1, and stores the stock symbol for later
+*read()	- opens the socket and parses the buffer, which is then concatenated into a useful message for the user
+*release() - finds the symbol in the used table, sets the used flag to 0 and erases its symbol entry
+*unlink() - removes a stock ticker symbol from the favorites list 
+*utimens() - adds a stock ticker symbol to the favorites list
+*write() - doesn't actually do anything but the file system can handle it because it's implemented
+*init() - function that initializes the structs when the file system is first mounted
+
+File System Commands
+--------------------
+./stockfs mnt - mounts the file system to the mnt folder calls init()
+cat [symbol] - reads the stock information from the yahoo stock api calls getattr(), open(), read(), release()
+touch [symbol] - adds a stock ticker to the favorites list calls getattr(), utimens()
+ls - displays a list of all of the favorited stocks calls readdir()
+rm [symbol] - removes a stock from the favorites list calls getattr(), unlink()
+nano [symbol] - reads the stock information into a file that cannot be saved calls open(), read()
+
+Encountered Problems
+--------------------
+Overall the project was fairly simple to implement, setting up the socket was easy, parsing the data was easy and my method could probably have been optimized better but it works. 
+
+Biggest problem I encountered was with sending the ticker symbol into the filler() function where I kept sending it a pointer instead of the actual text. I ended up fixing this by parsing the stock symbol from the socket instead of from the path variable. 
+
+The next issue I had was with the stock symbol pointer getting copied into the favorites table, this made it so that every time a stock was added to the favorites list, it would overwrite the previously added stock and place the same stock multiple times. This was fixed by running the strdup() function which hard copies the entire pointer over, thus removing the odd link.
+
+Overall Impressions of Assignment
+--------------------------------
+I spent a lot of time working on this assignment probably 30+ hours, I was probably ahead of most of the class throughout the entire assignment so when a lot of things wouldn't work, I did my own research to try and figure it out. A lot of the stuff that I had figured out was then placed into the assignment so people who hadn't started working yet where given a lot more extra help than what I had. I'm happy with my work and I'm glad I had the opportunity to learn something new.
+
